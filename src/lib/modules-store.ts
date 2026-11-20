@@ -1,6 +1,9 @@
 import type { LearningModule, LearningCard, StudentProgress } from '@/types/database';
 import { createClient } from './supabase/client';
 
+// Regex validasi format UUID v4 standar
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Modul terverifikasi awal untuk kelas SLBN Manisrejo
 const DEFAULT_MODULES: LearningModule[] = [
   {
@@ -149,6 +152,15 @@ export async function fetchModuleByShareCode(code: string): Promise<{
     return { module: null, cards: [], error: 'Kode kelas harus 6 digit angka.' };
   }
 
+  // 1. Cek terlebih dahulu jika kode cocok dengan modul demo bawaan (misal '123456' / '654321')
+  const localModules = getLocalModules();
+  const localFound = localModules.find((m) => m.share_code === cleanCode);
+  if (localFound && !UUID_REGEX.test(localFound.id)) {
+    const cards = getLocalCards(localFound.id);
+    return { module: localFound, cards, error: null };
+  }
+
+  // 2. Jika bukan demo bawaan, cek ke database Supabase
   const supabase = createClient();
   if (supabase) {
     try {
@@ -158,9 +170,7 @@ export async function fetchModuleByShareCode(code: string): Promise<{
         .eq('share_code', cleanCode)
         .maybeSingle();
 
-      if (modError) {
-        console.error('Error fetch Supabase module:', modError);
-      } else if (moduleData) {
+      if (!modError && moduleData) {
         const parsedModule = moduleData as LearningModule;
         const { data: cardsData } = await supabase
           .from('learning_cards')
@@ -174,20 +184,18 @@ export async function fetchModuleByShareCode(code: string): Promise<{
           error: null,
         };
       }
-    } catch (e) {
-      console.error('Koneksi Supabase gagal, beralih ke cache lokal:', e);
+    } catch {
+      // Abaikan jika jaringan/Supabase belum tersambung
     }
   }
 
-  // Fallback lokal
-  const modules = getLocalModules();
-  const found = modules.find((m) => m.share_code === cleanCode);
-  if (!found) {
-    return { module: null, cards: [], error: 'Kode kelas tidak ditemukan. Periksa lagi kode dari guru.' };
+  // 3. Fallback ke modul yang tersimpan di cache lokal
+  if (localFound) {
+    const cards = getLocalCards(localFound.id);
+    return { module: localFound, cards, error: null };
   }
 
-  const cards = getLocalCards(found.id);
-  return { module: found, cards, error: null };
+  return { module: null, cards: [], error: 'Kode kelas tidak ditemukan. Periksa lagi kode dari guru.' };
 }
 
 export async function fetchModuleById(id: string): Promise<{
@@ -195,6 +203,19 @@ export async function fetchModuleById(id: string): Promise<{
   cards: LearningCard[];
   error: string | null;
 }> {
+  // Jika ID bukan UUID (seperti 'mod-1', 'mod-2'), ambil langsung dari data lokal
+  // Mencegah Postgres error: "invalid input syntax for type uuid"
+  if (!UUID_REGEX.test(id)) {
+    const modules = getLocalModules();
+    const found = modules.find((m) => m.id === id);
+    if (!found) {
+      return { module: null, cards: [], error: 'Modul tidak ditemukan.' };
+    }
+    const cards = getLocalCards(found.id);
+    return { module: found, cards, error: null };
+  }
+
+  // Jika ID berformat UUID, cari di Supabase
   const supabase = createClient();
   if (supabase) {
     try {
@@ -204,9 +225,7 @@ export async function fetchModuleById(id: string): Promise<{
         .eq('id', id)
         .maybeSingle();
 
-      if (modError) {
-        console.error('Error fetch Supabase module by id:', modError);
-      } else if (moduleData) {
+      if (!modError && moduleData) {
         const parsedModule = moduleData as LearningModule;
         const { data: cardsData } = await supabase
           .from('learning_cards')
@@ -220,8 +239,8 @@ export async function fetchModuleById(id: string): Promise<{
           error: null,
         };
       }
-    } catch (e) {
-      console.error('Koneksi Supabase gagal, beralih ke cache lokal:', e);
+    } catch {
+      // Abaikan jika jaringan offline
     }
   }
 
@@ -261,9 +280,7 @@ export async function saveModuleAndCards(
         .select('id')
         .single();
 
-      if (modErr) throw modErr;
-
-      if (insertedMod) {
+      if (!modErr && insertedMod) {
         const typedInserted = insertedMod as { id: string };
         const cardsToInsert = cardsData.map((c, idx) => ({
           ...c,
@@ -274,7 +291,7 @@ export async function saveModuleAndCards(
         return { success: true, moduleId: typedInserted.id, error: null };
       }
     } catch (e) {
-      console.error('Gagal simpan ke Supabase, simpan ke cache lokal:', e);
+      console.warn('Gagal simpan ke Supabase, simpan ke cache lokal:', e);
     }
   }
 
@@ -315,19 +332,22 @@ export async function saveStudentProgress(
     completed_at: new Date().toISOString(),
   };
 
-  const supabase = createClient();
-  if (supabase) {
-    try {
-      await supabase.from('student_progress').insert({
-        module_id: moduleId,
-        score,
-        total_questions: totalQuestions,
-        is_peer_tutor: isPeerTutor,
-        student_name_guest: studentName || 'Siswa Kelas',
-      });
-      return;
-    } catch (e) {
-      console.error('Error simpan progres ke Supabase:', e);
+  // Hanya kirim ke Supabase jika moduleId berupa UUID yang valid
+  if (UUID_REGEX.test(moduleId)) {
+    const supabase = createClient();
+    if (supabase) {
+      try {
+        await supabase.from('student_progress').insert({
+          module_id: moduleId,
+          score,
+          total_questions: totalQuestions,
+          is_peer_tutor: isPeerTutor,
+          student_name_guest: studentName || 'Siswa Kelas',
+        });
+        return;
+      } catch (e) {
+        console.warn('Error simpan progres ke Supabase:', e);
+      }
     }
   }
 

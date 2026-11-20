@@ -76,6 +76,7 @@ export function AccessibilityToolbar({
             type="button"
             onClick={toggleContrast}
             aria-pressed={contrast === 'high'}
+            suppressHydrationWarning
             className={`inline-flex min-h-12 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none ${
               contrast === 'high'
                 ? 'border-black bg-black text-white'
@@ -83,7 +84,9 @@ export function AccessibilityToolbar({
             }`}
           >
             <Eye className="h-5 w-5" aria-hidden="true" />
-            <span>{contrast === 'high' ? 'Kontras: Tinggi' : 'Kontras Tinggi'}</span>
+            <span suppressHydrationWarning>
+              {contrast === 'high' ? 'Kontras: Tinggi' : 'Kontras Tinggi'}
+            </span>
           </button>
 
           {/* 2. Pengatur Ukuran Huruf */}
@@ -102,6 +105,7 @@ export function AccessibilityToolbar({
                   aria-checked={active}
                   aria-label={scale.desc}
                   onClick={() => setTextScale(scale.key)}
+                  suppressHydrationWarning
                   className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2.5 text-base font-bold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none ${
                     active
                       ? 'bg-brand text-white'
@@ -129,6 +133,7 @@ export function AccessibilityToolbar({
                   role="radio"
                   aria-checked={active}
                   onClick={() => setSignPreference(pref)}
+                  suppressHydrationWarning
                   className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-bold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none ${
                     active
                       ? 'bg-brand text-white'
@@ -152,6 +157,7 @@ export function AccessibilityToolbar({
               type="button"
               onClick={toggleContrast}
               aria-pressed={contrast === 'high'}
+              suppressHydrationWarning
               className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border px-4 py-2 font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus ${
                 contrast === 'high'
                   ? 'border-black bg-black text-white'
@@ -159,7 +165,9 @@ export function AccessibilityToolbar({
               }`}
             >
               <Eye className="h-5 w-5" aria-hidden="true" />
-              <span>{contrast === 'high' ? 'Matikan Kontras Tinggi' : 'Nyalakan Kontras Tinggi'}</span>
+              <span suppressHydrationWarning>
+                {contrast === 'high' ? 'Matikan Kontras Tinggi' : 'Nyalakan Kontras Tinggi'}
+              </span>
             </button>
 
             <div className="flex items-center justify-between gap-2">
@@ -170,6 +178,7 @@ export function AccessibilityToolbar({
                     key={scale.key}
                     type="button"
                     onClick={() => setTextScale(scale.key)}
+                    suppressHydrationWarning
                     className={`min-h-12 min-w-12 rounded-xl border px-3 py-2 font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus ${
                       textScale === scale.key
                         ? 'border-brand bg-brand text-white'
@@ -190,6 +199,7 @@ export function AccessibilityToolbar({
                     key={pref}
                     type="button"
                     onClick={() => setSignPreference(pref)}
+                    suppressHydrationWarning
                     className={`min-h-12 rounded-xl border px-4 py-2 font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus ${
                       signPreference === pref
                         ? 'border-brand bg-brand text-white'

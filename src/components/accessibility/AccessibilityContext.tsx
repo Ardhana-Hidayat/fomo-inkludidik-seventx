@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
 import type { SignPreference } from '@/types/database';
 
 export type TextScale = 'normal' | 'large' | 'xlarge';
@@ -23,37 +23,70 @@ const STORAGE_KEYS = {
   SIGN_PREF: 'inkludidik_sign_pref',
 };
 
-function getInitialContrast(): ContrastMode {
-  if (typeof window === 'undefined') return 'standard';
-  try {
-    const saved = localStorage.getItem(STORAGE_KEYS.CONTRAST);
-    if (saved === 'high' || saved === 'standard') return saved;
-  } catch {}
-  return 'standard';
+const CHANGE_EVENT = 'inkludidik_settings_change';
+
+function subscribe(callback: () => void) {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener('storage', callback);
+  window.addEventListener(CHANGE_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(CHANGE_EVENT, callback);
+  };
 }
 
-function getInitialTextScale(): TextScale {
+function notifyChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(CHANGE_EVENT));
+  }
+}
+
+function getContrastSnapshot(): ContrastMode {
+  if (typeof window === 'undefined') return 'standard';
+  try {
+    const val = localStorage.getItem(STORAGE_KEYS.CONTRAST);
+    return val === 'high' ? 'high' : 'standard';
+  } catch {
+    return 'standard';
+  }
+}
+
+function getTextScaleSnapshot(): TextScale {
   if (typeof window === 'undefined') return 'normal';
   try {
-    const saved = localStorage.getItem(STORAGE_KEYS.TEXT_SCALE);
-    if (saved && ['normal', 'large', 'xlarge'].includes(saved)) return saved as TextScale;
+    const val = localStorage.getItem(STORAGE_KEYS.TEXT_SCALE);
+    if (val && ['normal', 'large', 'xlarge'].includes(val)) return val as TextScale;
   } catch {}
   return 'normal';
 }
 
-function getInitialSignPref(): SignPreference {
+function getSignPrefSnapshot(): SignPreference {
   if (typeof window === 'undefined') return 'SIBI';
   try {
-    const saved = localStorage.getItem(STORAGE_KEYS.SIGN_PREF);
-    if (saved === 'SIBI' || saved === 'BISINDO') return saved;
+    const val = localStorage.getItem(STORAGE_KEYS.SIGN_PREF);
+    if (val === 'SIBI' || val === 'BISINDO') return val;
   } catch {}
   return 'SIBI';
 }
 
 export function AccessibilityProvider({ children }: { children: React.ReactNode }) {
-  const [contrast, setContrast] = useState<ContrastMode>(getInitialContrast);
-  const [textScale, setTextScaleState] = useState<TextScale>(getInitialTextScale);
-  const [signPreference, setSignPreferenceState] = useState<SignPreference>(getInitialSignPref);
+  const contrast = useSyncExternalStore(
+    subscribe,
+    getContrastSnapshot,
+    () => 'standard' as ContrastMode
+  );
+
+  const textScale = useSyncExternalStore(
+    subscribe,
+    getTextScaleSnapshot,
+    () => 'normal' as TextScale
+  );
+
+  const signPreference = useSyncExternalStore(
+    subscribe,
+    getSignPrefSnapshot,
+    () => 'SIBI' as SignPreference
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute('data-contrast', contrast);
@@ -62,25 +95,23 @@ export function AccessibilityProvider({ children }: { children: React.ReactNode 
 
   function toggleContrast() {
     const next = contrast === 'standard' ? 'high' : 'standard';
-    setContrast(next);
-    document.documentElement.setAttribute('data-contrast', next);
     try {
       localStorage.setItem(STORAGE_KEYS.CONTRAST, next);
+      notifyChange();
     } catch {}
   }
 
   function setTextScale(scale: TextScale) {
-    setTextScaleState(scale);
-    document.documentElement.setAttribute('data-text-scale', scale);
     try {
       localStorage.setItem(STORAGE_KEYS.TEXT_SCALE, scale);
+      notifyChange();
     } catch {}
   }
 
   function setSignPreference(pref: SignPreference) {
-    setSignPreferenceState(pref);
     try {
       localStorage.setItem(STORAGE_KEYS.SIGN_PREF, pref);
+      notifyChange();
     } catch {}
   }
 
