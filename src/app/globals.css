@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #FAF9F5;
+  --bg-surface: #FFFFFF;
+  --bg-surface-subtle: #F2EFE9;
+  --border-subtle: #D6D3CD;
+  --border-strong: #6B7280;
+  --border-focus: #1D4ED8;
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #4B5563;
+  --text-inverse: #FFFFFF;
+  --accent-primary: #1E40AF;
+  --accent-hover: #1E3A8A;
+  --accent-subtle: #EFF6FF;
+  --status-success-bg: #DCFCE7;
+  --status-success-text: #14532D;
+  --status-success-border: #15803D;
+  --status-retry-bg: #FEF3C7;
+  --status-retry-text: #78350F;
+  --status-retry-border: #B45309;
+  --status-error-bg: #FEE2E2;
+  --status-error-text: #7F1D1D;
+}
+
+[data-contrast="high"] {
+  --bg-canvas: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-subtle: #F3F4F6;
+  --border-subtle: #000000;
+  --border-strong: #000000;
+  --border-focus: #000000;
+  --text-primary: #000000;
+  --text-secondary: #111827;
+  --text-muted: #111827;
+  --accent-primary: #0F2D8A;
+  --accent-hover: #091D5C;
+  --accent-subtle: #E0E7FF;
+  --status-success-bg: #D1FAE5;
+  --status-success-text: #064E3B;
+  --status-success-border: #065F46;
+  --status-retry-bg: #FDE68A;
+  --status-retry-text: #451A03;
+  --status-retry-border: #78350F;
+}
+
+html[data-text-scale="normal"] { font-size: 16px; }
+html[data-text-scale="large"]  { font-size: 18px; }
+html[data-text-scale="xlarge"] { font-size: 20px; }
+
+@theme inline {
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
+  --color-canvas: var(--bg-canvas);
+  --color-surface: var(--bg-surface);
+  --color-surface-subtle: var(--bg-surface-subtle);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-focus: var(--border-focus);
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-brand: var(--accent-primary);
+  --color-brand-hover: var(--accent-hover);
+  --color-brand-subtle: var(--accent-subtle);
+  --color-success-bg: var(--status-success-bg);
+  --color-success-ink: var(--status-success-text);
+  --color-success-border: var(--status-success-border);
+  --color-retry-bg: var(--status-retry-bg);
+  --color-retry-ink: var(--status-retry-text);
+  --color-retry-border: var(--status-retry-border);
+  --color-error-bg: var(--status-error-bg);
+  --color-error-ink: var(--status-error-text);
+}
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
