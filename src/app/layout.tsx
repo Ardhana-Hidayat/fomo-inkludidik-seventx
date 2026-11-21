@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Lexend, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { AccessibilityProvider } from '@/components/accessibility/AccessibilityContext';
+import { ToastProvider } from '@/components/ui/ToastContext';
 
 const lexend = Lexend({
   subsets: ['latin'],
@@ -37,7 +38,9 @@ export default function RootLayout({
     >
       <body className="flex min-h-screen flex-col bg-canvas text-ink font-sans antialiased">
         <AccessibilityProvider>
-          {children}
+          <ToastProvider>
+            {children}
+          </ToastProvider>
         </AccessibilityProvider>
       </body>
     </html>

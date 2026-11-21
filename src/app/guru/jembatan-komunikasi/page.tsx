@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AccessibilityToolbar } from '@/components/accessibility/AccessibilityToolbar';
 import { useAccessibility } from '@/components/accessibility/AccessibilityContext';
+import { useToast } from '@/components/ui/ToastContext';
 import { SignBox } from '@/components/cards/SignBox';
 import type { InstructionStepData } from '@/lib/gemini';
 import {
   Mic,
-  MicOff,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -18,12 +18,15 @@ import {
 
 export default function JembatanKomunikasiPage() {
   const { signPreference } = useAccessibility();
+  const toast = useToast();
 
   // State Input Guru
   const [inputText, setInputText] = useState('Ambil buku dan pensil lalu duduk tenang.');
   const [isListening, setIsListening] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   // State Hasil Langkah Isyarat
   const [steps, setSteps] = useState<InstructionStepData[]>([
@@ -51,6 +54,52 @@ export default function JembatanKomunikasiPage() {
   const [speedMultiplier, setSpeedMultiplier] = useState<0.5 | 0.75 | 1 | 1.25>(1);
   const [activeLetterIdx, setActiveLetterIdx] = useState<number | null>(null);
 
+  // Sinkronisasi status Fullscreen HTML5 bawaan browser
+  useEffect(() => {
+    function handleFullscreenChange() {
+      const active = Boolean(
+        document.fullscreenElement ||
+        // @ts-expect-error fallback browser vendor prefix
+        document.webkitFullscreenElement ||
+        // @ts-expect-error fallback browser vendor prefix
+        document.msFullscreenElement
+      );
+      setIsFullscreen(active);
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Mode Layar Penuh Native Browser (memenuhi seluruh windows / monitor Smart TV)
+  async function toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        } else if ('webkitRequestFullscreen' in document.documentElement) {
+          // @ts-expect-error fallback browser vendor prefix
+          await document.documentElement.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ('webkitExitFullscreen' in document) {
+          // @ts-expect-error fallback browser vendor prefix
+          await document.webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Gagal mengubah mode layar penuh browser:', err);
+      // Fallback CSS jika izin Fullscreen browser dibatasi
+      setIsFullscreen((prev) => !prev);
+    }
+  }
+
   // Speech Recognition (Web Speech API)
   function toggleSpeechRecognition() {
     if (typeof window === 'undefined') return;
@@ -59,12 +108,19 @@ export default function JembatanKomunikasiPage() {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert('Perangkat/browser belum mendukung pengenalan suara mikrofon.');
+      toast.error('Browser belum mendukung pengenalan suara mikrofon.');
       return;
     }
 
     if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {}
+        recognitionRef.current = null;
+      }
       setIsListening(false);
+      toast.info('Perekaman suara dihentikan.');
       return;
     }
 
@@ -74,44 +130,71 @@ export default function JembatanKomunikasiPage() {
       recognition.continuous = false;
       recognition.interimResults = false;
 
-      recognition.onstart = () => setIsListening(true);
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.info('Mendengarkan instruksi guru...');
+      };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onresult = (event: any) => {
         const transcript = event.results[0]?.[0]?.transcript || '';
         setInputText(transcript);
         setIsListening(false);
+        recognitionRef.current = null;
+        if (transcript.trim().length > 0) {
+          toast.success(`Suara terdeteksi: "${transcript}". Mengonversi ke TV...`);
+          // Otomatis convert tanpa perlu guru mengklik tombol terjemahkan lagi
+          executeTranslate(transcript);
+        }
       };
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+        toast.error('Gagal mengenali suara. Coba ulangi lagi.');
+      };
+      recognition.onend = () => {
+        setIsListening(false);
+        recognitionRef.current = null;
+      };
 
+      recognitionRef.current = recognition;
       recognition.start();
     } catch {
       setIsListening(false);
+      recognitionRef.current = null;
     }
   }
 
-  async function handleTranslate() {
-    if (!inputText.trim()) return;
+  async function executeTranslate(textOverride?: string) {
+    const text = (textOverride ?? inputText).trim();
+    if (!text) {
+      toast.error('Ketik atau rekam kalimat instruksi terlebih dahulu.');
+      return;
+    }
 
     setIsTranslating(true);
+    toast.info('Menerjemahkan instruksi ke isyarat...');
     try {
       const res = await fetch('/api/ai/translate-instruction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          instruction: inputText.trim(),
+          instruction: text,
           signPreference,
         }),
       });
 
       const json = await res.json();
-      if (res.ok && json.data) {
+      if (res.ok && json.data && json.data.length > 0) {
         setSteps(json.data);
         setCurrentStepIdx(0);
         setActiveLetterIdx(null);
+        toast.success('Instruksi berhasil ditampilkan di layar TV!');
+      } else {
+        toast.error('Gagal menerjemahkan instruksi.');
       }
     } catch (err) {
       console.error('Gagal menerjemahkan instruksi:', err);
+      toast.error('Terjadi kendala jaringan.');
     } finally {
       setIsTranslating(false);
     }
@@ -166,7 +249,7 @@ export default function JembatanKomunikasiPage() {
 
       <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col justify-between px-4 py-6 sm:px-6 2xl:px-8">
         {/* Panel Kontrol Guru (Input Instruksi Lisan & Teks) */}
-        <div className="rounded-2xl border-2 border-border-subtle bg-surface p-4 sm:p-6 shadow-sm">
+        <div className="rounded-2xl border-2 border-border-subtle bg-surface p-4 shadow-sm sm:p-6">
           <div className="flex items-center justify-between border-b border-border-subtle pb-3">
             <h1 className="text-xl font-bold tracking-tight text-ink sm:text-2xl">
               Jembatan Komunikasi Guru–Siswa (Smart TV Mode)
@@ -174,8 +257,8 @@ export default function JembatanKomunikasiPage() {
 
             <button
               type="button"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
+              onClick={toggleFullscreen}
+              className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
             >
               {isFullscreen ? (
                 <>
@@ -203,15 +286,23 @@ export default function JembatanKomunikasiPage() {
             <button
               type="button"
               onClick={toggleSpeechRecognition}
-              className={`inline-flex min-h-14 min-w-14 items-center justify-center rounded-xl border-2 px-4 transition-colors ${
+              className={`inline-flex min-h-14 min-w-14 items-center justify-center gap-2 rounded-xl border-2 px-4 transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus ${
                 isListening
-                  ? 'border-red-600 bg-red-100 text-red-800'
+                  ? 'border-red-700 bg-red-600 text-white shadow-md'
                   : 'border-border-strong bg-surface text-ink hover:bg-surface-subtle'
               }`}
-              title="Gunakan Mikrofon Suara"
+              title={isListening ? 'Sedang merekam suara instruksi... Klik untuk berhenti' : 'Gunakan Mikrofon Suara'}
+              aria-label={isListening ? 'Sedang merekam suara guru. Klik untuk berhenti merekam' : 'Gunakan Mikrofon Suara'}
             >
               {isListening ? (
-                <MicOff className="h-6 w-6 animate-pulse" />
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-80" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-white" />
+                  </span>
+                  <Mic className="h-6 w-6 animate-pulse text-white" />
+                  <span className="text-sm font-bold text-white">Merekam...</span>
+                </div>
               ) : (
                 <Mic className="h-6 w-6" />
               )}
@@ -219,7 +310,7 @@ export default function JembatanKomunikasiPage() {
 
             <button
               type="button"
-              onClick={handleTranslate}
+              onClick={() => executeTranslate()}
               disabled={isTranslating}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50"
             >
@@ -231,27 +322,27 @@ export default function JembatanKomunikasiPage() {
 
         {/* AREA TAMPILAN SMART TV (GRID 12-KOLOM SESUAI DESIGN.MD SECTION 3.2) */}
         {currentStep && (
-          <section className="mt-8 flex-1 rounded-2xl border-2 border-border-subtle bg-surface p-6 sm:p-10 2xl:p-14">
+          <section className="mt-8 flex-1 rounded-2xl border-2 border-border-subtle bg-surface p-6 shadow-sm sm:p-10 2xl:p-14">
             <div className="flex items-center justify-between border-b border-border-subtle pb-4">
               <span className="font-mono text-lg font-bold text-ink-muted 2xl:text-2xl">
                 Langkah {currentStepIdx + 1} dari {steps.length}
               </span>
-              <span className="rounded-lg border border-border-strong bg-surface-subtle px-3 py-1 text-sm font-bold uppercase text-ink">
+              <span className="rounded-lg border-2 border-border-strong bg-surface-subtle px-3 py-1 text-sm font-bold uppercase text-ink">
                 Sistem Isyarat: {signPreference}
               </span>
             </div>
 
             <div className="mt-8 grid grid-cols-1 items-center gap-8 lg:grid-cols-12">
-              {/* SISI KIRI: DERETAN HURUF ISYARAT RAKSASA (7 KOLOM) */}
+              {/* SISI KIRI: DERETAN HURUF ISYARAT RAKSASA (7 KOLOM) - ADAPTIF UNTUK 2-3 KATA */}
               <div className="lg:col-span-7">
-                <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 2xl:gap-6">
+                <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3.5 2xl:gap-5">
                   {currentStep.sign_letters.map((ltr, lIdx) => (
                     <SignBox
                       key={`${ltr}-${lIdx}`}
                       letter={ltr}
                       system={signPreference}
                       isActive={activeLetterIdx === lIdx}
-                      size="large"
+                      size={currentStep.sign_letters.length > 6 ? 'normal' : 'large'}
                       onClick={() => setActiveLetterIdx(lIdx)}
                     />
                   ))}
@@ -287,7 +378,7 @@ export default function JembatanKomunikasiPage() {
           </button>
 
           {/* Pilihan Kecepatan Langkah Diskrit */}
-          <div className="flex items-center gap-2 rounded-xl border border-border-strong bg-surface p-1">
+          <div className="flex items-center gap-2 rounded-xl border-2 border-border-strong bg-surface p-1">
             <span className="px-3 text-sm font-bold text-ink-muted">Kecepatan:</span>
             {([0.5, 0.75, 1, 1.25] as const).map((spd) => (
               <button

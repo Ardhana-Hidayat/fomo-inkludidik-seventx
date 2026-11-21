@@ -5,7 +5,7 @@ import { createClient } from './supabase/client';
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Modul terverifikasi awal untuk kelas SLBN Manisrejo
-const DEFAULT_MODULES: LearningModule[] = [
+export const DEFAULT_MODULES: LearningModule[] = [
   {
     id: 'mod-1',
     teacher_id: 'guru-1',
@@ -14,7 +14,7 @@ const DEFAULT_MODULES: LearningModule[] = [
     mode: 'kosakata',
     share_code: '123456',
     is_published: true,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T08:00:00.000Z',
   },
   {
     id: 'mod-2',
@@ -24,7 +24,7 @@ const DEFAULT_MODULES: LearningModule[] = [
     mode: 'demonstrasi',
     share_code: '654321',
     is_published: true,
-    created_at: new Date().toISOString(),
+    created_at: '2026-01-01T08:00:00.000Z',
   },
 ];
 
@@ -372,4 +372,49 @@ export function getAllStudentProgress(): StudentProgress[] {
     if (raw) return JSON.parse(raw);
   } catch {}
   return [];
+}
+
+export async function deleteModule(moduleId: string): Promise<{ success: boolean; error: string | null }> {
+  // 1. Jika modul bertipe UUID Supabase, hapus dari database remote
+  if (UUID_REGEX.test(moduleId)) {
+    const supabase = createClient();
+    if (supabase) {
+      try {
+        const { error: delError } = await supabase.from('modules').delete().eq('id', moduleId);
+        if (delError) {
+          console.warn('Catatan penghapusan Supabase:', delError.message);
+        }
+      } catch (err) {
+        console.warn('Error koneksi Supabase saat menghapus modul:', err);
+      }
+    }
+  }
+
+  // 2. Hapus modul dari penyimpanan lokal (LocalStorage)
+  if (typeof window !== 'undefined') {
+    try {
+      const currentModules = getLocalModules();
+      const updatedModules = currentModules.filter((m) => m.id !== moduleId);
+      localStorage.setItem(STORAGE_KEYS.MODULES, JSON.stringify(updatedModules));
+
+      const rawCards = localStorage.getItem(STORAGE_KEYS.CARDS);
+      if (rawCards) {
+        const allCards: Record<string, LearningCard[]> = JSON.parse(rawCards);
+        delete allCards[moduleId];
+        localStorage.setItem(STORAGE_KEYS.CARDS, JSON.stringify(allCards));
+      }
+
+      const rawProg = localStorage.getItem(STORAGE_KEYS.PROGRESS);
+      if (rawProg) {
+        const allProg: StudentProgress[] = JSON.parse(rawProg);
+        const updatedProg = allProg.filter((p) => p.module_id !== moduleId);
+        localStorage.setItem(STORAGE_KEYS.PROGRESS, JSON.stringify(updatedProg));
+      }
+    } catch (err) {
+      console.error('Gagal menghapus modul dari storage lokal:', err);
+      return { success: false, error: 'Gagal memperbarui penyimpanan lokal browser.' };
+    }
+  }
+
+  return { success: true, error: null };
 }

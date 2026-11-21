@@ -106,17 +106,17 @@ export async function translateInstructionWithAI(
     return getFallbackInstructions(rawInstruction);
   }
 
-  const prompt = `Anda adalah penerjemah instruksi kelas SLB (Sekolah Luar Biasa).
+  const prompt = `Anda adalah penerjemah instruksi kelas SLB (Sekolah Luar Biasa) untuk siswa tunarungu dan tunagrahita.
 Kalimat guru: "${rawInstruction}".
 Preferensi isyarat: ${signPreference}.
 
 Tugas:
-Pecah kalimat instruksi tersebut menjadi 2-4 urutan aksi konkret yang sangat ringkas untuk ditampilkan di layar Smart TV kelas.
+Pecah kalimat instruksi tersebut menjadi urutan aksi konkret yang jelas untuk ditampilkan di layar Smart TV kelas (minimal 1 hingga 4 langkah aksi).
 Setiap langkah:
 - 'step_number': Angka urutan (1, 2, 3...)
-- 'action_label': Kalimat tindakan aktif (maksimal 2-3 kata, misal "Ambil Buku", "Buka Halaman 5", "Duduk Tenang")
-- 'simple_explanation': Instruksi konkret (maksimal 5 kata)
-- 'sign_letters': Huruf kapital ejaan kata kunci utama untuk isyarat tangan.`;
+- 'action_label': Kalimat tindakan aktif yang menampung minimal 2 hingga 4 kata agar konteks instruksi dipahami siswa secara utuh (contoh: "Ambil Buku Tulis", "Cuci Tangan Bersih", "Duduk Rapi di Kursi", "Buka Halaman Lima").
+- 'simple_explanation': Instruksi konkret ramah anak berkebutuhan khusus (maksimal 7 kata).
+- 'sign_letters': Array huruf kapital untuk ejaan isyarat jari. Tampung 2 atau 3 kata penting dalam tindakan tersebut agar mencakup lebih banyak kata untuk dipelajari anak (misalnya untuk aksi "Ambil Buku", sertakan huruf ['A','M','B','I','L','B','U','K','U'] atau minimal 2 kata kunci utama, tanpa tanda baca atau spasi, hanya huruf A-Z kapital, maksimal 12 huruf).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -234,7 +234,7 @@ function getFallbackInstructions(rawInstruction: string): InstructionStepData[] 
     return [
       {
         step_number: 1,
-        action_label: 'Duduk Tenang',
+        action_label: 'Duduk Tenang Rapi',
         simple_explanation: 'Duduk rapi di bangku kelas.',
         sign_letters: ['D', 'U', 'D', 'U', 'K'],
       },
@@ -242,15 +242,23 @@ function getFallbackInstructions(rawInstruction: string): InstructionStepData[] 
   }
 
   return parts.slice(0, 4).map((part, index) => {
-    const firstWord = part.split(' ')[0] || 'Aksi';
-    const cleanWord = firstWord.toUpperCase().replace(/[^A-Z]/g, '');
-    const letters = cleanWord ? cleanWord.split('') : ['S', 'I', 'A', 'P'];
+    // Ambil 2 hingga 3 kata pertama agar menampung lebih banyak kata secara bermakna
+    const words = part.split(/\s+/).filter(Boolean).slice(0, 3);
+    const cleanLetters = words
+      .join('')
+      .toUpperCase()
+      .replace(/[^A-Z]/g, '')
+      .split('')
+      .slice(0, 12);
+
+    const fallbackLetters = cleanLetters.length > 0 ? cleanLetters : ['S', 'I', 'A', 'P'];
+    const actionLabel = words.join(' ') || part;
 
     return {
       step_number: index + 1,
-      action_label: part.length > 20 ? part.slice(0, 20) : part,
+      action_label: actionLabel.length > 30 ? actionLabel.slice(0, 30) : actionLabel,
       simple_explanation: `${part}.`,
-      sign_letters: letters.slice(0, 5),
+      sign_letters: fallbackLetters,
     };
   });
 }

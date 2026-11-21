@@ -1,0 +1,81 @@
+name: InkluDidik CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------
+  # TAHAP 1: VALIDASI KUALITAS KODE & PENGUJIAN UNIT (AUTOMATED TEST)
+  # -------------------------------------------------------------
+  test-and-verify:
+    name: Lint, Unit Tests & Build Verification
+    runs-on: ubuntu-latest
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://vmailnuloaoonmqeguok.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-anon-key-for-build' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || 'dummy-service-key-for-build' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'dummy-gemini-key-for-build' }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Jalankan ESLint (Code Quality & Accessibility Standards)
+        run: npm run lint
+
+      - name: Jalankan Unit Test (Vitest Suite)
+        run: npm run test
+
+      - name: Uji Kompilasi Build Next.js (Turbopack)
+        run: npm run build
+
+  # -------------------------------------------------------------
+  # TAHAP 2: DEPLOY OTOMATIS KE VERCEL PRODUCTION
+  # Berjalan hanya jika push ke branch 'main' dan seluruh test lulus
+  # -------------------------------------------------------------
+  deploy-production:
+    name: Deploy to Vercel Production
+    runs-on: ubuntu-latest
+    needs: test-and-verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: ./

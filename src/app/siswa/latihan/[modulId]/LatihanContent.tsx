@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AccessibilityToolbar } from '@/components/accessibility/AccessibilityToolbar';
 import { useAccessibility } from '@/components/accessibility/AccessibilityContext';
+import { useToast } from '@/components/ui/ToastContext';
 import { fetchModuleById, saveStudentProgress } from '@/lib/modules-store';
 import { TapToMatch, type QuizQuestion } from '@/components/games/TapToMatch';
 import type { LearningModule } from '@/types/database';
@@ -11,6 +12,7 @@ import { Award, RotateCcw, ArrowRight } from 'lucide-react';
 
 export function LatihanContent({ moduleId }: { moduleId: string }) {
   const { signPreference } = useAccessibility();
+  const toast = useToast();
 
   const [moduleData, setModuleData] = useState<LearningModule | null>(null);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
@@ -78,6 +80,7 @@ export function LatihanContent({ moduleId }: { moduleId: string }) {
     setFinalScore(score);
     setTotalQuestions(total);
     setIsCompleted(true);
+    toast.success(`Latihan selesai! Skor kamu: ${score} dari ${total}`);
 
     if (moduleId) {
       await saveStudentProgress(moduleId, score, total, isPeerTutor);
@@ -128,8 +131,8 @@ export function LatihanContent({ moduleId }: { moduleId: string }) {
             )}
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-border-subtle bg-surface p-8 text-center shadow-sm">
-            <div className="mx-auto inline-flex min-h-20 min-w-20 items-center justify-center rounded-2xl bg-status-success-bg text-status-success-text">
+          <div className="mx-auto w-full max-w-md rounded-2xl border-2 border-border-subtle bg-surface p-8 text-center shadow-md">
+            <div className="mx-auto inline-flex min-h-20 min-w-20 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800">
               <Award className="h-10 w-10" aria-hidden="true" />
             </div>
 
@@ -153,7 +156,7 @@ export function LatihanContent({ moduleId }: { moduleId: string }) {
                 onClick={() => {
                   setIsCompleted(false);
                 }}
-                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-6 py-3 text-lg font-bold text-ink hover:bg-surface-subtle"
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-6 py-3 text-lg font-bold text-ink transition-colors hover:bg-surface-subtle"
               >
                 <RotateCcw className="h-5 w-5" />
                 <span>Ulangi Latihan</span>
@@ -161,7 +164,7 @@ export function LatihanContent({ moduleId }: { moduleId: string }) {
 
               <Link
                 href="/"
-                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-lg font-bold text-white hover:bg-brand-hover"
+                className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 text-lg font-bold text-white transition-colors hover:bg-brand-hover"
               >
                 <span>Selesai & Ke Beranda</span>
                 <ArrowRight className="h-5 w-5" />

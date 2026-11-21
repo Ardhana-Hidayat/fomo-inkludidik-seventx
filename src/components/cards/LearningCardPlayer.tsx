@@ -91,7 +91,7 @@ export function LearningCardPlayer({
   const isLast = currentIndex === totalCards - 1;
 
   return (
-    <article className="mx-auto flex w-full max-w-4xl flex-col rounded-2xl border-2 border-border-subtle bg-surface p-5 sm:p-8 2xl:p-12">
+    <article className="mx-auto flex w-full max-w-4xl flex-col rounded-2xl border-2 border-border-subtle bg-surface p-5 shadow-sm sm:p-8 2xl:p-12">
       {/* Indikator Progres Kartu */}
       <div className="flex items-center justify-between border-b border-border-subtle pb-4">
         <span className="font-mono text-base font-bold text-ink-muted sm:text-lg">
@@ -100,7 +100,7 @@ export function LearningCardPlayer({
         <button
           type="button"
           onClick={spellOutSigns}
-          className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-border-strong bg-surface px-4 py-2 text-sm font-semibold text-ink transition-colors duration-150 hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
+          className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors duration-150 hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
         >
           <Play className="h-4 w-4" aria-hidden="true" />
           <span>Eja Isyarat Otomatis</span>
@@ -109,10 +109,10 @@ export function LearningCardPlayer({
 
       {/* Bagian Kata Utama & Instruksi Pendek (Stop-Slop: Maksimal 5-7 kata) */}
       <div className="mt-6 text-center">
-        <h2 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl 2xl:text-6xl">
+        <h2 className="text-3xl font-extrabold tracking-tight text-ink sm:text-4xl 2xl:text-6xl">
           {card.word_or_step}
         </h2>
-        <p className="mt-2 text-lg text-ink-secondary sm:text-xl">
+        <p className="mt-2 text-lg font-medium text-ink-secondary sm:text-xl">
           {card.simple_explanation}
         </p>
       </div>
@@ -130,7 +130,7 @@ export function LearningCardPlayer({
             />
           ))}
         </div>
-        <p className="mt-3 text-center text-sm font-medium text-ink-muted">
+        <p className="mt-3 text-center text-sm font-semibold text-ink-muted">
           Ketuk huruf untuk melihat bentuk isyaratnya.
         </p>
       </div>
@@ -139,7 +139,7 @@ export function LearningCardPlayer({
       {audioError && (
         <p
           role="alert"
-          className="mt-4 rounded-xl border border-status-error-bg bg-status-error-bg p-3 text-center text-sm font-semibold text-status-error-text"
+          className="mt-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-center text-sm font-semibold text-red-900"
         >
           {audioError}
         </p>
@@ -151,7 +151,7 @@ export function LearningCardPlayer({
           type="button"
           onClick={() => playSpeech(card.audio_text || card.word_or_step)}
           disabled={isPlayingAudio}
-          className="inline-flex min-h-14 min-w-48 items-center justify-center gap-3 rounded-xl bg-brand px-8 py-3 text-lg font-bold text-white transition-colors duration-150 hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50 motion-reduce:transition-none 2xl:min-h-16 2xl:text-2xl"
+          className="inline-flex min-h-14 min-w-48 items-center justify-center gap-3 rounded-xl bg-brand px-8 py-3 text-lg font-bold text-white shadow-md transition-colors duration-150 hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50 motion-reduce:transition-none 2xl:min-h-16 2xl:text-2xl"
         >
           <Volume2 className="h-6 w-6" aria-hidden="true" />
           <span>{isPlayingAudio ? 'Memutar Suara...' : 'Putar Suara'}</span>
@@ -174,7 +174,7 @@ export function LearningCardPlayer({
           <button
             type="button"
             onClick={onFinish || onNext}
-            className="inline-flex min-h-14 items-center gap-2 rounded-xl bg-status-success-border px-6 py-3 text-lg font-bold text-white transition-colors duration-150 hover:bg-green-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
+            className="inline-flex min-h-14 items-center gap-2 rounded-xl border-2 border-emerald-900 bg-emerald-700 px-6 py-3 text-lg font-bold text-white shadow-md transition-colors duration-150 hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
           >
             <Check className="h-5 w-5" aria-hidden="true" />
             <span>Mulai Latihan</span>

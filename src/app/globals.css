@@ -64,6 +64,7 @@ html[data-text-scale="xlarge"] { font-size: 20px; }
   --color-brand: var(--accent-primary);
   --color-brand-hover: var(--accent-hover);
   --color-brand-subtle: var(--accent-subtle);
+
   --color-success-bg: var(--status-success-bg);
   --color-success-ink: var(--status-success-text);
   --color-success-border: var(--status-success-border);
@@ -72,6 +73,16 @@ html[data-text-scale="xlarge"] { font-size: 20px; }
   --color-retry-border: var(--status-retry-border);
   --color-error-bg: var(--status-error-bg);
   --color-error-ink: var(--status-error-text);
+
+  /* Status Aliases agar kompatibel langsung dengan kelas bg-status-* */
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-success-border: var(--status-success-border);
+  --color-status-retry-bg: var(--status-retry-bg);
+  --color-status-retry-text: var(--status-retry-text);
+  --color-status-retry-border: var(--status-retry-border);
+  --color-status-error-bg: var(--status-error-bg);
+  --color-status-error-text: var(--status-error-text);
 }
 
 body {

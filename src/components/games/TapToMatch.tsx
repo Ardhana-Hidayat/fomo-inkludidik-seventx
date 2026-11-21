@@ -87,7 +87,7 @@ export function TapToMatch({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col rounded-2xl border-2 border-border-subtle bg-surface p-6 sm:p-8 2xl:p-12">
+    <div className="mx-auto flex w-full max-w-3xl flex-col rounded-2xl border-2 border-border-subtle bg-surface p-6 shadow-sm sm:p-8 2xl:p-12">
       {/* Header Latihan & Mode Peer Tutor */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-4">
         <span className="font-mono text-base font-bold text-ink-muted sm:text-lg">
@@ -95,7 +95,7 @@ export function TapToMatch({
         </span>
 
         {/* Sakelar Peer Tutor */}
-        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-border-strong bg-surface px-3 py-1.5 text-sm font-semibold text-ink">
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-3 py-1.5 text-sm font-semibold text-ink hover:bg-surface-subtle">
           <input
             type="checkbox"
             checked={isPeerTutor}
@@ -115,7 +115,7 @@ export function TapToMatch({
         <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl 2xl:text-5xl">
           {currentQuestion.targetWord}
         </h2>
-        <p className="mt-2 text-lg text-ink-secondary">
+        <p className="mt-2 text-lg font-medium text-ink-secondary">
           {currentQuestion.targetExplanation}
         </p>
       </div>
@@ -130,10 +130,10 @@ export function TapToMatch({
           if (isSelected) {
             if (isCorrect) {
               stateStyle =
-                'border-2 border-status-success-border bg-status-success-bg text-status-success-text ring-2 ring-status-success-border';
+                'border-2 border-emerald-600 bg-emerald-50 text-emerald-950 ring-2 ring-emerald-600';
             } else {
               stateStyle =
-                'border-2 border-status-retry-border bg-status-retry-bg text-status-retry-text';
+                'border-2 border-amber-600 bg-amber-50 text-amber-950';
             }
           }
 
@@ -164,16 +164,16 @@ export function TapToMatch({
           {isCorrect ? (
             <div
               role="alert"
-              className="flex items-center justify-between rounded-xl border-2 border-status-success-border bg-status-success-bg p-4 text-status-success-text"
+              className="flex items-center justify-between rounded-xl border-2 border-emerald-600 bg-emerald-50 p-4 text-emerald-950 shadow-sm"
             >
               <div className="flex items-center gap-3">
-                <Check className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                <Check className="h-6 w-6 flex-shrink-0 text-emerald-700" aria-hidden="true" />
                 <span className="text-lg font-bold">Bagus! Pilihanmu tepat.</span>
               </div>
               <button
                 type="button"
                 onClick={handleNext}
-                className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-status-success-border px-5 py-2 text-base font-bold text-white transition-colors duration-150 hover:bg-green-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-emerald-900 bg-emerald-700 px-5 py-2 text-base font-bold text-white shadow-md transition-colors duration-150 hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
               >
                 <span>Soal Berikutnya</span>
                 <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -182,10 +182,10 @@ export function TapToMatch({
           ) : (
             <div
               role="alert"
-              className="flex items-center justify-between rounded-xl border-2 border-status-retry-border bg-status-retry-bg p-4 text-status-retry-text"
+              className="flex items-center justify-between rounded-xl border-2 border-amber-600 bg-amber-50 p-4 text-amber-950 shadow-sm"
             >
               <div className="flex items-center gap-3">
-                <RotateCcw className="h-6 w-6 flex-shrink-0" aria-hidden="true" />
+                <RotateCcw className="h-6 w-6 flex-shrink-0 text-amber-700" aria-hidden="true" />
                 <span className="text-lg font-bold">
                   Belum pas. Coba pilih gambar lain.
                 </span>
@@ -193,7 +193,7 @@ export function TapToMatch({
               <button
                 type="button"
                 onClick={handleRetry}
-                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-status-retry-border bg-surface px-5 py-2 text-base font-bold text-status-retry-text transition-colors duration-150 hover:bg-status-retry-bg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-amber-700 bg-white px-5 py-2 text-base font-bold text-amber-900 transition-colors duration-150 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
               >
                 <span>Coba Lagi</span>
               </button>

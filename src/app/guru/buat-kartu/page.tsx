@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AccessibilityToolbar } from '@/components/accessibility/AccessibilityToolbar';
 import { useAccessibility } from '@/components/accessibility/AccessibilityContext';
+import { useToast } from '@/components/ui/ToastContext';
 import { saveModuleAndCards } from '@/lib/modules-store';
 import { SignBox } from '@/components/cards/SignBox';
 import type { GeneratedCardData } from '@/lib/gemini';
@@ -14,11 +15,13 @@ import {
   CheckCircle,
   Plus,
   Trash2,
+  PenTool,
 } from 'lucide-react';
 
 export default function BuatKartuPage() {
   const router = useRouter();
   const { signPreference } = useAccessibility();
+  const toast = useToast();
 
   // State Form Input
   const [topic, setTopic] = useState('');
@@ -28,7 +31,7 @@ export default function BuatKartuPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // State Kartu Hasil AI
+  // State Kartu Hasil AI / Manual
   const [cards, setCards] = useState<GeneratedCardData[]>([]);
   const [savedShareCode, setSavedShareCode] = useState<string | null>(null);
 
@@ -43,12 +46,15 @@ export default function BuatKartuPage() {
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
     if (!topic.trim()) {
-      setErrorMsg('Masukkan topik pembelajaran terlebih dahulu.');
+      const msg = 'Masukkan topik pembelajaran terlebih dahulu.';
+      setErrorMsg(msg);
+      toast.error(msg);
       return;
     }
 
     setIsGenerating(true);
     setErrorMsg(null);
+    toast.info('Sedang membuat kartu peraga dengan AI...');
 
     try {
       const res = await fetch('/api/ai/generate-cards', {
@@ -66,12 +72,30 @@ export default function BuatKartuPage() {
         throw new Error(json.error || 'Gagal membuat kartu.');
       }
 
-      setCards(json.data || []);
+      const generated = json.data || [];
+      setCards(generated);
+      toast.success(`${generated.length} kartu peraga berhasil dibuat!`);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Terjadi kesalahan sistem.';
       setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  function handleStartManual() {
+    setErrorMsg(null);
+    if (cards.length === 0) {
+      setCards([
+        {
+          word_or_step: topic.trim() || 'Buku',
+          simple_explanation: 'Buku dipakai untuk belajar.',
+          image_keyword: 'book',
+          sign_letters: ['B', 'U', 'K', 'U'],
+        },
+      ]);
+      toast.info('Mode kartu manual siap diedit.');
     }
   }
 
@@ -84,7 +108,11 @@ export default function BuatKartuPage() {
   }
 
   function handleDeleteCard(idx: number) {
-    setCards((prev) => prev.filter((_, i) => i !== idx));
+    setCards((prev) => {
+      const filtered = prev.filter((_, i) => i !== idx);
+      toast.info('Kartu berhasil dihapus.');
+      return filtered;
+    });
   }
 
   function handleAddCard() {
@@ -97,13 +125,18 @@ export default function BuatKartuPage() {
         sign_letters: ['B', 'A', 'R', 'U'],
       },
     ]);
+    toast.info('Kartu baru berhasil ditambahkan.');
   }
 
   async function handleSaveModule() {
-    if (cards.length === 0) return;
+    if (cards.length === 0) {
+      toast.error('Belum ada kartu untuk disimpan.');
+      return;
+    }
 
     setIsSaving(true);
     setErrorMsg(null);
+    toast.info('Menyimpan modul ke database...');
 
     // Buat kode 6-digit acak yang mudah diingat anak
     const randomCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -111,7 +144,7 @@ export default function BuatKartuPage() {
     const result = await saveModuleAndCards(
       {
         teacher_id: 'guru-1',
-        title: topic.trim() || 'Modul Kartu Peraga',
+        title: topic.trim() || 'Modul Pembelajaran Kelas',
         rombel,
         mode: 'kosakata',
         share_code: randomCode,
@@ -131,8 +164,11 @@ export default function BuatKartuPage() {
 
     if (result.success) {
       setSavedShareCode(randomCode);
+      toast.success('Modul berhasil diterbitkan ke kelas!');
     } else {
-      setErrorMsg(result.error || 'Gagal menyimpan modul.');
+      const msg = result.error || 'Gagal menyimpan modul.';
+      setErrorMsg(msg);
+      toast.error(msg);
     }
   }
 
@@ -155,19 +191,19 @@ export default function BuatKartuPage() {
         {savedShareCode && (
           <div
             role="alert"
-            className="mt-6 rounded-2xl border-2 border-status-success-border bg-status-success-bg p-6 text-status-success-text"
+            className="mt-6 rounded-2xl border-2 border-emerald-600 bg-emerald-50 p-6 text-emerald-950 shadow-md"
           >
             <div className="flex items-center gap-3">
-              <CheckCircle className="h-8 w-8 flex-shrink-0" aria-hidden="true" />
+              <CheckCircle className="h-8 w-8 flex-shrink-0 text-emerald-700" aria-hidden="true" />
               <div>
                 <h2 className="text-xl font-bold">Modul Berhasil Diterbitkan!</h2>
-                <p className="mt-1 text-sm text-ink-secondary">
+                <p className="mt-1 text-sm text-emerald-800">
                   Siswa dapat langsung membuka modul ini di HP atau Smart TV kelas dengan kode:
                 </p>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-status-success-border bg-white p-4">
+            <div className="mt-4 flex items-center gap-3 rounded-xl border-2 border-emerald-600 bg-white p-4">
               <span className="text-xs font-bold uppercase text-ink-muted">Kode Kelas 6-Digit:</span>
               <span className="font-mono text-3xl font-extrabold tracking-widest text-brand">
                 {savedShareCode}
@@ -178,7 +214,7 @@ export default function BuatKartuPage() {
               <button
                 type="button"
                 onClick={() => router.push('/guru/dashboard')}
-                className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-status-success-border px-6 py-2.5 text-base font-bold text-white transition-colors hover:bg-green-800"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-emerald-900 bg-emerald-700 px-6 py-2.5 text-base font-bold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
               >
                 <span>Kembali ke Dashboard</span>
               </button>
@@ -189,7 +225,7 @@ export default function BuatKartuPage() {
                   setCards([]);
                   setTopic('');
                 }}
-                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-white px-6 py-2.5 text-base font-bold text-ink transition-colors hover:bg-slate-100"
+                className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-white px-6 py-2.5 text-base font-bold text-ink transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
               >
                 <span>Buat Modul Lain</span>
               </button>
@@ -199,7 +235,7 @@ export default function BuatKartuPage() {
 
         {/* FORM 3 LANGKAH RAMAH GURU SENIOR */}
         {!savedShareCode && (
-          <form onSubmit={handleGenerate} className="mt-8 rounded-2xl border-2 border-border-subtle bg-surface p-6 sm:p-8">
+          <form onSubmit={handleGenerate} className="mt-8 rounded-2xl border-2 border-border-subtle bg-surface p-6 shadow-sm sm:p-8">
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* Langkah 1: Input Topik */}
               <div className="md:col-span-2">
@@ -217,10 +253,13 @@ export default function BuatKartuPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => setTopic('Langkah Mencuci Tangan Bersih')}
+                    onClick={() => {
+                      setTopic('Langkah Mencuci Tangan Bersih');
+                      toast.info('Topik contoh dimuat.');
+                    }}
                     className="inline-flex min-h-14 min-w-14 items-center justify-center rounded-xl border-2 border-border-strong bg-surface p-3 text-ink-muted hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
-                    title="Simulasi Unggah Foto Halaman Buku"
-                    aria-label="Simulasi Unggah Foto Halaman Buku"
+                    title="Muat Contoh Materi Buku"
+                    aria-label="Muat Contoh Materi Buku"
                   >
                     <Camera className="h-6 w-6" aria-hidden="true" />
                   </button>
@@ -233,8 +272,11 @@ export default function BuatKartuPage() {
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setTopic(item)}
-                      className="rounded-lg border border-border-subtle bg-surface-subtle px-3 py-1 text-xs font-semibold text-ink hover:border-border-strong"
+                      onClick={() => {
+                        setTopic(item);
+                        toast.info(`Topik dipilih: ${item}`);
+                      }}
+                      className="rounded-lg border border-border-subtle bg-surface-subtle px-3 py-1.5 text-xs font-semibold text-ink hover:border-border-strong"
                     >
                       {item}
                     </button>
@@ -284,55 +326,65 @@ export default function BuatKartuPage() {
             </div>
 
             {errorMsg && (
-              <p role="alert" className="mt-4 rounded-xl border border-status-error-bg bg-status-error-bg p-3 text-sm font-semibold text-status-error-text">
+              <p role="alert" className="mt-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">
                 {errorMsg}
               </p>
             )}
 
-            {/* Tombol Aksi: Buat Kartu (Ukuran Besar >= 56px) */}
-            <div className="mt-8 flex justify-end">
+            {/* Tombol Aksi Form: Buat Kartu Otomatis & Buat Manual */}
+            <div className="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-border-subtle pt-6">
+              <button
+                type="button"
+                onClick={handleStartManual}
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-6 py-3 text-lg font-bold text-ink transition-colors duration-150 hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus motion-reduce:transition-none"
+              >
+                <PenTool className="h-5 w-5" aria-hidden="true" />
+                <span>Buat Manual</span>
+              </button>
+
               <button
                 type="submit"
                 disabled={isGenerating}
                 className="inline-flex min-h-14 items-center justify-center gap-3 rounded-xl bg-brand px-8 py-3 text-lg font-bold text-white transition-colors duration-150 hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50 motion-reduce:transition-none"
               >
                 <Sparkles className="h-6 w-6" aria-hidden="true" />
-                <span>{isGenerating ? 'Membuat Kartu...' : 'Buat Kartu'}</span>
+                <span>{isGenerating ? 'Membuat Kartu...' : 'Buat Kartu Otomatis'}</span>
               </button>
             </div>
           </form>
         )}
 
-        {/* PRATINJAU & EDITOR KARTU HASIL AI */}
+        {/* PRATINJAU & EDITOR KARTU */}
         {cards.length > 0 && !savedShareCode && (
           <section className="mt-12">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-2xl font-bold tracking-tight text-ink">
-                  Pratinjau Kartu Peraga ({cards.length} Kartu)
+                  Daftar Kartu Peraga ({cards.length} Kartu)
                 </h2>
                 <p className="mt-1 text-sm text-ink-secondary">
-                  Periksa atau edit teks sebelum diterbitkan ke kelas siswa.
+                  Periksa atau edit teks sebelum disimpan dan diterbitkan ke kelas siswa.
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              {/* Tombol Simpan Atas (Jelas, Kontras Tinggi & Terlihat Nyata) */}
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={handleAddCard}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors hover:bg-surface-subtle"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-5 py-2.5 text-base font-bold text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                   <span>Tambah Kartu</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveModule}
                   disabled={isSaving}
-                  className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-status-success-border px-6 py-2 text-base font-bold text-white transition-colors hover:bg-green-800 disabled:opacity-50"
+                  className="inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-emerald-900 bg-emerald-700 px-6 py-2.5 text-base font-bold text-white shadow-md transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50"
                 >
-                  <Save className="h-4 w-4" />
-                  <span>{isSaving ? 'Menyimpan...' : 'Simpan & Dapatkan Kode'}</span>
+                  <Save className="h-5 w-5" />
+                  <span>{isSaving ? 'Menyimpan...' : 'Simpan Modul'}</span>
                 </button>
               </div>
             </div>
@@ -350,8 +402,9 @@ export default function BuatKartuPage() {
                     <button
                       type="button"
                       onClick={() => handleDeleteCard(idx)}
-                      className="rounded-lg p-1.5 text-ink-muted hover:bg-status-error-bg hover:text-status-error-text"
-                      title="Hapus Kartu"
+                      className="rounded-lg p-2 text-ink-muted hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                      title="Hapus Kartu Ini"
+                      aria-label={`Hapus Kartu ${idx + 1}`}
                     >
                       <Trash2 className="h-5 w-5" />
                     </button>
@@ -407,14 +460,24 @@ export default function BuatKartuPage() {
               ))}
             </div>
 
-            <div className="mt-8 flex justify-end">
+            {/* Tombol Simpan Bawah (Ekstra Besar, Sangat Jelas & Mudah Dilihat) */}
+            <div className="mt-8 flex flex-wrap items-center justify-end gap-3 rounded-2xl border-2 border-border-subtle bg-surface p-4 sm:p-6">
+              <button
+                type="button"
+                onClick={handleAddCard}
+                className="inline-flex min-h-14 items-center gap-2 rounded-xl border-2 border-border-strong bg-surface px-6 py-3 text-lg font-bold text-ink hover:bg-surface-subtle"
+              >
+                <Plus className="h-5 w-5" />
+                <span>Tambah Kartu</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleSaveModule}
                 disabled={isSaving}
-                className="inline-flex min-h-14 items-center gap-2 rounded-xl bg-status-success-border px-8 py-3 text-lg font-bold text-white transition-colors hover:bg-green-800 disabled:opacity-50"
+                className="inline-flex min-h-14 items-center gap-3 rounded-xl border-2 border-emerald-900 bg-emerald-700 px-8 py-3 text-lg font-bold text-white shadow-lg transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50"
               >
-                <Save className="h-5 w-5" />
+                <Save className="h-6 w-6" />
                 <span>{isSaving ? 'Menyimpan Modul...' : 'Simpan & Publikasikan ke Kelas'}</span>
               </button>
             </div>

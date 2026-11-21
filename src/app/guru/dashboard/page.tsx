@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AccessibilityToolbar } from '@/components/accessibility/AccessibilityToolbar';
-import { getAllModules, getAllStudentProgress } from '@/lib/modules-store';
+import { useToast } from '@/components/ui/ToastContext';
+import { DEFAULT_MODULES, getAllModules, getAllStudentProgress, deleteModule } from '@/lib/modules-store';
 import type { LearningModule, StudentProgress } from '@/types/database';
 import {
   Sparkles,
@@ -14,17 +15,58 @@ import {
   Check,
   ArrowRight,
   TrendingUp,
+  Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function GuruDashboardPage() {
-  const [modules] = useState<LearningModule[]>(getAllModules);
-  const [progressList] = useState<StudentProgress[]>(getAllStudentProgress);
+  const toast = useToast();
+  // Gunakan DEFAULT_MODULES dan [] untuk render awal SSR & client yang 100% identik (bebas hydration mismatch)
+  const [modules, setModules] = useState<LearningModule[]>(DEFAULT_MODULES);
+  const [progressList, setProgressList] = useState<StudentProgress[]>([]);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [moduleToDelete, setModuleToDelete] = useState<LearningModule | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    // Sinkronkan data aktual dari LocalStorage setelah komponen terhidrasi di client (non-blocking)
+    let isMounted = true;
+    Promise.resolve().then(() => {
+      if (isMounted) {
+        setModules(getAllModules());
+        setProgressList(getAllStudentProgress());
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function handleCopy(code: string) {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    toast.success(`Kode kelas ${code} berhasil disalin ke clipboard!`);
     setTimeout(() => setCopiedCode(null), 2000);
+  }
+
+  async function handleConfirmDelete() {
+    if (!moduleToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteModule(moduleToDelete.id);
+      if (res.success) {
+        setModules((prev) => prev.filter((m) => m.id !== moduleToDelete.id));
+        setProgressList((prev) => prev.filter((p) => p.module_id !== moduleToDelete.id));
+        toast.success(`Modul "${moduleToDelete.title}" berhasil dihapus.`);
+      } else {
+        toast.error(res.error || 'Gagal menghapus modul.');
+      }
+    } catch {
+      toast.error('Terjadi kesalahan saat menghapus modul.');
+    } finally {
+      setIsDeleting(false);
+      setModuleToDelete(null);
+    }
   }
 
   return (
@@ -33,7 +75,7 @@ export default function GuruDashboardPage() {
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 2xl:px-8">
         {/* Banner Selamat Datang Guru Senior */}
-        <div className="flex flex-col justify-between gap-4 rounded-2xl border-2 border-border-subtle bg-surface p-6 sm:flex-row sm:items-center sm:p-8">
+        <div className="flex flex-col justify-between gap-4 rounded-2xl border-2 border-border-subtle bg-surface p-6 shadow-sm sm:flex-row sm:items-center sm:p-8">
           <div>
             <span className="text-sm font-bold uppercase tracking-wider text-brand">
               Ruang Guru SLBN Manisrejo
@@ -117,7 +159,7 @@ export default function GuruDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-ink">Modul Belajar Siswa</h3>
-                  <p className="text-sm text-ink-secondary">
+                  <p className="text-sm text-ink-secondary" suppressHydrationWarning>
                     {modules.length} modul aktif siap dipraktikkan di kelas.
                   </p>
                 </div>
@@ -139,7 +181,7 @@ export default function GuruDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-ink">Progres & Skor Latihan</h3>
-                  <p className="text-sm text-ink-secondary">
+                  <p className="text-sm text-ink-secondary" suppressHydrationWarning>
                     {progressList.length} aktivitas latihan siswa tercatat.
                   </p>
                 </div>
@@ -166,69 +208,98 @@ export default function GuruDashboardPage() {
             </Link>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-            {modules.map((m) => (
-              <div
-                key={m.id}
-                className="flex flex-col justify-between rounded-2xl border-2 border-border-subtle bg-surface p-6"
+          {modules.length === 0 ? (
+            <div className="mt-4 rounded-2xl border-2 border-dashed border-border-subtle bg-surface p-8 text-center">
+              <p className="text-base font-semibold text-ink">Belum ada modul kelas aktif.</p>
+              <p className="mt-1 text-sm text-ink-secondary">
+                Buat modul baru menggunakan generator AI atau buat kartu instruksi secara mandiri.
+              </p>
+              <Link
+                href="/guru/buat-kartu"
+                className="mt-4 inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-brand-hover"
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="rounded-md border border-border-strong bg-surface-subtle px-2.5 py-1 text-xs font-bold text-ink">
-                      {m.rombel}
-                    </span>
-                    <span className="text-xs font-semibold uppercase text-ink-muted">
-                      Mode: {m.mode}
-                    </span>
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                <span>Buat Modul Sekarang</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {modules.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex flex-col justify-between rounded-2xl border-2 border-border-subtle bg-surface p-6 shadow-sm transition-all hover:border-border-strong"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-md border border-border-strong bg-surface-subtle px-2.5 py-1 text-xs font-bold text-ink">
+                          {m.rombel}
+                        </span>
+                        <span className="text-xs font-semibold uppercase text-ink-muted">
+                          Mode: {m.mode}
+                        </span>
+                      </div>
+
+                      {/* Tombol Hapus Modul dengan Icon Trash */}
+                      <button
+                        type="button"
+                        onClick={() => setModuleToDelete(m)}
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border-2 border-transparent text-ink-muted transition-colors hover:border-red-400 hover:bg-red-50 hover:text-red-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
+                        title={`Hapus modul ${m.title}`}
+                        aria-label={`Hapus modul ${m.title}`}
+                      >
+                        <Trash2 className="h-5 w-5 text-red-600" aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    <h3 className="mt-3 text-xl font-bold text-ink">{m.title}</h3>
+
+                    <div className="mt-4 flex items-center gap-2 rounded-xl border-2 border-border-strong bg-surface-subtle p-3">
+                      <span className="text-xs font-bold uppercase text-ink-muted">
+                        Kode Kelas:
+                      </span>
+                      <span className="font-mono text-xl font-bold tracking-widest text-brand">
+                        {m.share_code}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(m.share_code)}
+                        className="ml-auto inline-flex min-h-10 items-center gap-1 rounded-lg border-2 border-border-strong bg-surface px-3 py-1.5 text-xs font-bold text-ink transition-colors hover:bg-surface-subtle"
+                        aria-label={`Salin kode kelas ${m.share_code}`}
+                      >
+                        {copiedCode === m.share_code ? (
+                          <>
+                            <Check className="h-4 w-4 text-emerald-700" />
+                            <span className="text-emerald-800">Tersalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-4 w-4" />
+                            <span>Salin</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
-                  <h3 className="mt-3 text-xl font-bold text-ink">{m.title}</h3>
-
-                  <div className="mt-4 flex items-center gap-2 rounded-xl border border-border-strong bg-surface-subtle p-3">
-                    <span className="text-xs font-bold uppercase text-ink-muted">
-                      Kode Kelas:
-                    </span>
-                    <span className="font-mono text-xl font-bold tracking-widest text-brand">
-                      {m.share_code}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(m.share_code)}
-                      className="ml-auto inline-flex min-h-10 items-center gap-1 rounded-lg border border-border-strong bg-surface px-2.5 py-1 text-xs font-semibold text-ink transition-colors hover:bg-surface-subtle"
-                      aria-label={`Salin kode kelas ${m.share_code}`}
+                  <div className="mt-6 flex items-center gap-3 border-t border-border-subtle pt-4">
+                    <Link
+                      href={`/siswa/belajar/${m.id}`}
+                      className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-hover"
                     >
-                      {copiedCode === m.share_code ? (
-                        <>
-                          <Check className="h-4 w-4 text-green-700" />
-                          <span>Tersalin</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          <span>Salin</span>
-                        </>
-                      )}
-                    </button>
+                      Buka Demonstrasi
+                    </Link>
+                    <Link
+                      href={`/siswa/latihan/${m.id}`}
+                      className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl border-2 border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors hover:bg-surface-subtle"
+                    >
+                      Buka Latihan
+                    </Link>
                   </div>
                 </div>
-
-                <div className="mt-6 flex items-center gap-3 border-t border-border-subtle pt-4">
-                  <Link
-                    href={`/siswa/belajar/${m.id}`}
-                    className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brand-hover"
-                  >
-                    Buka Demonstrasi
-                  </Link>
-                  <Link
-                    href={`/siswa/latihan/${m.id}`}
-                    className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl border-2 border-border-strong bg-surface px-4 py-2 text-sm font-bold text-ink transition-colors hover:bg-surface-subtle"
-                  >
-                    Buka Latihan
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* REKAP PROGRES LATIHAN SISWA */}
@@ -240,7 +311,7 @@ export default function GuruDashboardPage() {
           <div className="mt-4 overflow-hidden rounded-2xl border-2 border-border-subtle bg-surface">
             {progressList.length === 0 ? (
               <div className="p-8 text-center text-ink-secondary">
-                <p className="text-base">Belum ada data belajar siswa hari ini.</p>
+                <p className="text-base font-semibold">Belum ada data belajar siswa hari ini.</p>
                 <p className="mt-1 text-sm text-ink-muted">
                   Bagikan kode kelas 6-digit di atas kepada siswa atau orang tua di rumah.
                 </p>
@@ -277,7 +348,7 @@ export default function GuruDashboardPage() {
                         <td className="px-6 py-4 font-mono font-bold text-brand">
                           {item.score} / {item.total_questions}
                         </td>
-                        <td className="px-6 py-4 text-xs text-ink-muted">
+                        <td className="px-6 py-4 text-xs text-ink-muted" suppressHydrationWarning>
                           {new Date(item.completed_at).toLocaleTimeString('id-ID', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -291,6 +362,59 @@ export default function GuruDashboardPage() {
             )}
           </div>
         </section>
+
+        {/* MODAL DIALOG KONFIRMASI HAPUS MODUL (ACCESSIBLE & SAFE) */}
+        {moduleToDelete && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-delete-title"
+            aria-describedby="modal-delete-desc"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+          >
+            <div className="relative w-full max-w-md rounded-2xl border-2 border-border-strong bg-surface p-6 shadow-2xl sm:p-8">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700">
+                  <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <div>
+                  <h3 id="modal-delete-title" className="text-xl font-bold text-ink">
+                    Hapus Modul Kelas?
+                  </h3>
+                  <p className="text-xs font-semibold text-red-600">
+                    Tindakan ini tidak dapat dibatalkan
+                  </p>
+                </div>
+              </div>
+
+              <p id="modal-delete-desc" className="mt-4 text-sm leading-relaxed text-ink-secondary">
+                Apakah Bapak/Ibu yakin ingin menghapus modul{' '}
+                <strong className="font-bold text-ink">“{moduleToDelete.title}”</strong> (Kode Kelas:{' '}
+                <span className="font-mono font-bold text-brand">{moduleToDelete.share_code}</span>)? Seluruh kartu peraga dan progres latihan siswa di modul ini akan dibersihkan.
+              </p>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModuleToDelete(null)}
+                  disabled={isDeleting}
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-border-strong bg-surface px-5 py-2.5 text-sm font-bold text-ink transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-red-900 bg-red-700 px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-red-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-focus disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  <span>{isDeleting ? 'Menghapus...' : 'Ya, Hapus Modul'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
